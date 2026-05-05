@@ -1,0 +1,6 @@
+# ignore backend and frontend directories
+backend/
+frontend/
+
+.env
+.DS_Store
