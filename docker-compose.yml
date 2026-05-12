@@ -13,7 +13,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   backend:
-    build: ./backend
+    image: ghcr.io/fedal-nl/cashier_backend_api:latest
     container_name: cashier_backend
     command: >
       sh -c "
@@ -34,7 +34,7 @@ services:
       - db
 
   frontend:
-    build: ./frontend
+    image: ghcr.io/fedal-nl/cashier_frontend:latest
     container_name: cashier_frontend
     volumes:
       - ./frontend:/app
