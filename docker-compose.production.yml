@@ -5,6 +5,9 @@ services:
     image: ghcr.io/fedal-nl/cashier_backend_api:latest
     container_name: cashier_backend
     restart: always
+  
+    volumes:
+      - ./staticfiles:/app/staticfiles
 
     command: >
       sh -c "
