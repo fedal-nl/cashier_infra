@@ -24,12 +24,8 @@ services:
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles
-    environment:
-      DB_NAME: cashier
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_HOST: db
-      DB_PORT: 5432
+    env_file: 
+      - .env
     depends_on:
       - db
 
