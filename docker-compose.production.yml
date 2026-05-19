@@ -30,4 +30,6 @@ services:
       timeout: 10s
       retries: 5
   frontend:
+    container_name: cashier_frontend
+    restart: always
     image: ghcr.io/fedal-nl/cashier_frontend:latest
