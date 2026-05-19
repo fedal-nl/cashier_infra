@@ -17,6 +17,7 @@ services:
     container_name: cashier_backend
     command: >
       sh -c "
+      uv run python manage.py makemigrations &&
       uv run python manage.py migrate &&
       uv run python manage.py collectstatic --noinput &&
       uv run python manage.py runserver 0.0.0.0:8000
@@ -30,13 +31,21 @@ services:
       - db
 
   frontend:
-    image: ghcr.io/fedal-nl/cashier_frontend:latest
+    # image: ghcr.io/fedal-nl/cashier_frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
     container_name: cashier_frontend
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    #ports:
+    #  - "3000:5173"
+    command: sh -c "npm install && npm run dev -- --host"
     stdin_open: true
     tty: true
+    env_file:
+      - .env
 
   nginx:
     image: nginx:alpine
