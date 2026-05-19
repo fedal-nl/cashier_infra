@@ -33,3 +33,5 @@ services:
     container_name: cashier_frontend
     restart: always
     image: ghcr.io/fedal-nl/cashier_frontend:latest
+    ports:
+      - "3000:80"
