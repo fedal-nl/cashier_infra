@@ -1,6 +1,7 @@
 # ignore backend and frontend directories
 backend/
 frontend/
+aklahlana-website/
 
 .env
 .env.prod
