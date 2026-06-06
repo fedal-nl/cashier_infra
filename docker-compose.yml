@@ -25,6 +25,7 @@ services:
     volumes:
       - ./backend:/app
       - static_volume:/app/staticfiles
+      - backend_venv:/app/.venv
     env_file: 
       - .env
     depends_on:
@@ -47,6 +48,20 @@ services:
     env_file:
       - .env
 
+  website:
+    build:
+      context: ./aklahlana-website
+      dockerfile: Dockerfile.dev
+    container_name: aklahlana_website
+    volumes:
+      - ./aklahlana-website:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev -- --host"
+    stdin_open: true
+    tty: true
+    env_file:
+      - .env
+
   nginx:
     image: nginx:alpine
     container_name: cashier_nginx
@@ -58,7 +73,9 @@ services:
     depends_on:
       - backend
       - frontend
+      - website
 
 volumes:
   postgres_data:
   static_volume:
+  backend_venv:

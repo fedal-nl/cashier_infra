@@ -29,9 +29,16 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
-  frontend:
-    container_name: cashier_frontend
-    restart: always
-    image: ghcr.io/fedal-nl/cashier_frontend:latest
-    ports:
-      - "3000:80"
+  # frontend:
+  #   container_name: cashier_frontend
+  #   restart: always
+  #   image: ghcr.io/fedal-nl/cashier_frontend:latest
+  #   ports:
+  #     - "3000:80"
+
+  # website:
+  #   container_name: aklahlana_website
+  #   restart: always
+  #   image: ghcr.io/fedal-nl/aklahlana_website:latest
+  #   ports:
+  #     - "3001:80"
