@@ -6,3 +6,4 @@ aklahlana-website/
 .env
 .env.prod
 .DS_Store
+nginx/nginx.conf
