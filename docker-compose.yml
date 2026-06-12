@@ -47,6 +47,8 @@ services:
     tty: true
     env_file:
       - .env
+    environment:
+      BASE: /app/
 
   website:
     build:
