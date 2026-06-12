@@ -5,6 +5,8 @@ services:
     image: ghcr.io/fedal-nl/cashier_backend_api:latest
     container_name: cashier_backend
     restart: always
+    labels:
+      autoheal: "true"
   
     volumes:
       - ./staticfiles:/app/staticfiles
@@ -25,20 +27,19 @@ services:
 
     # optional but recommended
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
       interval: 30s
       timeout: 10s
       retries: 5
-  # frontend:
-  #   container_name: cashier_frontend
-  #   restart: always
-  #   image: ghcr.io/fedal-nl/cashier_frontend:latest
-  #   ports:
-  #     - "3000:80"
+      start_period: 60s
 
-  # website:
-  #   container_name: aklahlana_website
-  #   restart: always
-  #   image: ghcr.io/fedal-nl/aklahlana_website:latest
-  #   ports:
-  #     - "3001:80"
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: cashier_autoheal
+    restart: always
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: 30
+      AUTOHEAL_START_PERIOD: 60
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
