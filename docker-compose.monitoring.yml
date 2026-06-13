@@ -1,0 +1,34 @@
+version: "3.9"
+
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    container_name: cashier_uptime_kuma
+    restart: always
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+    networks:
+      - monitoring
+
+  portainer:
+    image: portainer/portainer-ce:lts
+    container_name: cashier_portainer
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9443:9443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    name: cashier_monitoring
+
+volumes:
+  uptime_kuma_data:
+  portainer_data:
