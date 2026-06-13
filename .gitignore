@@ -7,3 +7,5 @@ aklahlana-website/
 .env.prod
 .DS_Store
 nginx/nginx.conf
+
+staticfiles/
