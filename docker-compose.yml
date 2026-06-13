@@ -15,6 +15,8 @@ services:
   backend:
     image: ghcr.io/fedal-nl/cashier_backend_api:latest
     container_name: cashier_backend
+    labels:
+      autoheal: "true"
     command: >
       sh -c "
       uv run python manage.py makemigrations &&
@@ -30,6 +32,12 @@ services:
       - .env
     depends_on:
       - db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   frontend:
     # image: ghcr.io/fedal-nl/cashier_frontend:latest
@@ -74,6 +82,17 @@ services:
       - backend
       - frontend
       - website
+
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: cashier_autoheal
+    restart: always
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: autoheal
+      AUTOHEAL_INTERVAL: 30
+      AUTOHEAL_START_PERIOD: 60
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   postgres_data:
