@@ -6,7 +6,7 @@ services:
     container_name: cashier_uptime_kuma
     restart: always
     ports:
-      - "3001:3001"
+      - "3002:3001"
     volumes:
       - uptime_kuma_data:/app/data
     networks:
@@ -17,7 +17,7 @@ services:
     container_name: cashier_portainer
     restart: always
     ports:
-      - "9000:9000"
+      - "9001:9000"
       - "9443:9443"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
