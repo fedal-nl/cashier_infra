@@ -87,6 +87,11 @@ services:
     image: willfarrell/autoheal:latest
     container_name: cashier_autoheal
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     environment:
       AUTOHEAL_CONTAINER_LABEL: autoheal
       AUTOHEAL_INTERVAL: 30

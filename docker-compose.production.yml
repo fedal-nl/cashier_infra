@@ -1,12 +1,32 @@
 version: "3.9"
 
 services:
+  db:
+    image: postgres:15
+    container_name: cashier_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
   backend:
     image: ghcr.io/fedal-nl/cashier_backend_api:latest
     container_name: cashier_backend
     restart: always
     labels:
       autoheal: "true"
+    depends_on:
+      db:
+        condition: service_healthy
   
     volumes:
       - ./staticfiles:/app/staticfiles
@@ -24,6 +44,8 @@ services:
 
     env_file:
       - .env
+    environment:
+      DB_HOST: db
 
     # optional but recommended
     healthcheck:
@@ -37,9 +59,17 @@ services:
     image: willfarrell/autoheal:latest
     container_name: cashier_autoheal
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     environment:
       AUTOHEAL_CONTAINER_LABEL: autoheal
       AUTOHEAL_INTERVAL: 30
       AUTOHEAL_START_PERIOD: 60
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  postgres_data:
