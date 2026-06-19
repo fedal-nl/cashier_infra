@@ -36,7 +36,7 @@ services:
       uv run python manage.py makemigrations &&
       uv run python manage.py migrate &&
       uv run python manage.py collectstatic --noinput &&
-      uv run gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --threads 2 --timeout 30
+      uv run gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --threads 2 --timeout 30 --max-requests 1000 --max-requests-jitter 100
       "
 
     ports:
@@ -48,6 +48,72 @@ services:
       DB_HOST: db
 
     # optional but recommended
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "10", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 12s
+      retries: 3
+      start_period: 60s
+
+  backend-2:
+    image: ghcr.io/fedal-nl/cashier_backend_api:latest
+    container_name: cashier_backend_2
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+    volumes:
+      - ./staticfiles:/app/staticfiles
+
+    command: >
+      sh -c "
+      uv run gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --threads 2 --timeout 30 --max-requests 1000 --max-requests-jitter 100
+      "
+
+    ports:
+      - "8001:8000"
+
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "10", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 12s
+      retries: 3
+      start_period: 60s
+
+  backend-3:
+    image: ghcr.io/fedal-nl/cashier_backend_api:latest
+    container_name: cashier_backend_3
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+
+    volumes:
+      - ./staticfiles:/app/staticfiles
+
+    command: >
+      sh -c "
+      uv run gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3 --threads 2 --timeout 30 --max-requests 1000 --max-requests-jitter 100
+      "
+
+    ports:
+      - "8002:8000"
+
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "10", "http://localhost:8000/health/"]
       interval: 30s
@@ -71,15 +137,17 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
-  # Watches the backend Docker health status. If the API becomes unhealthy,
-  # restart Postgres first and then the backend, because some API outages only
-  # recovered after the full API/database pair was restarted.
+  # Watches all backend Docker health statuses. If any API instance becomes
+  # unhealthy, restart Postgres first and then all backend instances, because
+  # some API outages only recovered after the full API/database group restarted.
   api-stack-autoheal:
     image: docker:27-cli
     container_name: cashier_api_stack_autoheal
     restart: always
     depends_on:
       - backend
+      - backend-2
+      - backend-3
       - db
     logging:
       driver: json-file
@@ -87,24 +155,30 @@ services:
         max-size: "10m"
         max-file: "5"
     environment:
-      WATCH_CONTAINER: cashier_backend
       DB_CONTAINER: cashier_db
-      BACKEND_CONTAINER: cashier_backend
+      BACKEND_CONTAINERS: cashier_backend cashier_backend_2 cashier_backend_3
       CHECK_INTERVAL: 30
       RESTART_COOLDOWN: 180
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    # Poll the backend health status through Docker. On unhealthy status,
-    # restart DB -> wait briefly -> restart backend -> wait before checking again.
+    # Poll the backend health statuses through Docker. If any backend is unhealthy,
+    # restart DB -> wait briefly -> restart all backends -> wait before checking again.
     command: >
       sh -c '
       while true; do
-        status="$$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" "$$WATCH_CONTAINER" 2>/dev/null || echo missing)";
-        if [ "$$status" = "unhealthy" ]; then
-          echo "$$(date -Iseconds) $$WATCH_CONTAINER is unhealthy. Restarting $$DB_CONTAINER, then $$BACKEND_CONTAINER.";
+        unhealthy="";
+        for container in $$BACKEND_CONTAINERS; do
+          status="$$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" "$$container" 2>/dev/null || echo missing)";
+          if [ "$$status" = "unhealthy" ]; then
+            unhealthy="$$container";
+            break;
+          fi;
+        done;
+        if [ -n "$$unhealthy" ]; then
+          echo "$$(date -Iseconds) $$unhealthy is unhealthy. Restarting $$DB_CONTAINER, then $$BACKEND_CONTAINERS.";
           docker restart "$$DB_CONTAINER";
           sleep 10;
-          docker restart "$$BACKEND_CONTAINER";
+          docker restart $$BACKEND_CONTAINERS;
           echo "$$(date -Iseconds) Restart completed. Cooling down for $$RESTART_COOLDOWN seconds.";
           sleep "$$RESTART_COOLDOWN";
         else
