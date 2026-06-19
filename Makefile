@@ -1,6 +1,23 @@
 # Makefile for frontend project
 # command to run: make {command name}
 
+.PHONY: help check-nginx reload-nginx deploy start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers get-autoheal-log-path backup
+
+help:
+	@echo "Available commands:"
+	@echo "  make help                  Show this help message"
+	@echo "  make check-nginx           Check nginx configuration"
+	@echo "  make reload-nginx          Reload nginx service"
+	@echo "  make deploy                Pull and start production containers"
+	@echo "  make restart-containers    Restart production containers"
+	@echo "  make stop-containers       Stop and remove production containers"
+	@echo "  make start-monitoring      Start monitoring containers"
+	@echo "  make stop-monitoring       Stop monitoring containers"
+	@echo "  make logs-monitoring       Tail monitoring logs"
+	@echo "  make logs-backend          Tail backend logs"
+	@echo "  make get-autoheal-log-path Print autoheal Docker log file path"
+	@echo "  make backup                Run Postgres backup script"
+
 # command to check nginx configuration
 check-nginx:
 	sudo nginx -t
@@ -29,6 +46,9 @@ logs-monitoring:
 # tail the logs of the backend container
 logs-backend:
 	docker compose -f docker-compose.production.yml logs -fd
+
+restart-containers:
+	docker compose -f docker-compose.production.yml restart
 
 stop-containers:
 	docker compose -f docker-compose.production.yml stop
