@@ -24,8 +24,6 @@ services:
     image: ghcr.io/fedal-nl/cashier_backend_api:latest
     container_name: cashier_backend
     restart: always
-    labels:
-      autoheal: "true"
     depends_on:
       db:
         condition: service_healthy
@@ -72,6 +70,48 @@ services:
       AUTOHEAL_START_PERIOD: 60
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
+  # Watches the backend Docker health status. If the API becomes unhealthy,
+  # restart Postgres first and then the backend, because some API outages only
+  # recovered after the full API/database pair was restarted.
+  api-stack-autoheal:
+    image: docker:27-cli
+    container_name: cashier_api_stack_autoheal
+    restart: always
+    depends_on:
+      - backend
+      - db
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    environment:
+      WATCH_CONTAINER: cashier_backend
+      DB_CONTAINER: cashier_db
+      BACKEND_CONTAINER: cashier_backend
+      CHECK_INTERVAL: 30
+      RESTART_COOLDOWN: 180
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Poll the backend health status through Docker. On unhealthy status,
+    # restart DB -> wait briefly -> restart backend -> wait before checking again.
+    command: >
+      sh -c '
+      while true; do
+        status="$$(docker inspect --format "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}" "$$WATCH_CONTAINER" 2>/dev/null || echo missing)";
+        if [ "$$status" = "unhealthy" ]; then
+          echo "$$(date -Iseconds) $$WATCH_CONTAINER is unhealthy. Restarting $$DB_CONTAINER, then $$BACKEND_CONTAINER.";
+          docker restart "$$DB_CONTAINER";
+          sleep 10;
+          docker restart "$$BACKEND_CONTAINER";
+          echo "$$(date -Iseconds) Restart completed. Cooling down for $$RESTART_COOLDOWN seconds.";
+          sleep "$$RESTART_COOLDOWN";
+        else
+          sleep "$$CHECK_INTERVAL";
+        fi;
+      done
+      '
 
 volumes:
   postgres_data:

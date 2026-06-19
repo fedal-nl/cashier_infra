@@ -57,5 +57,8 @@ stop-containers:
 get-autoheal-log-path:
 	docker inspect cashier_autoheal --format='{{.LogPath}}'
 
+check-db-connection:
+	docker exec cashier_db pg_isready -U "$DB_USER" -d "$DB_NAME"
+
 backup:
 	./backup_postgres.sh ENV_FILE=.env APP_NAME=cashier BACKUP_DIR=/home/omar/apps/backups/backups $0
