@@ -10,30 +10,32 @@ reload-nginx:
 	sudo systemctl reload nginx
 
 # on production pull the latest images using the docker-compose.production.yml file and restart the containers
-deploy-containers:
-	sudo docker compose -f docker-compose.production.yml pull
-	sudo docker compose -f docker-compose.production.yml up -d
+deploy:
+	docker compose -f docker-compose.production.yml pull
+	docker compose -f docker-compose.production.yml up -d
 
 # start the monitoring containers using the docker-compose.monitoring.yml file
 start-monitoring:
-	sudo docker compose -f docker-compose.monitoring.yml up -d
+	docker compose -f docker-compose.monitoring.yml up -d
 
 # stop the monitoring containers
 stop-monitoring:
-	sudo docker compose -f docker-compose.monitoring.yml down
+	docker compose -f docker-compose.monitoring.yml down
 
 # tail the logs of the monitoring containers
 logs-monitoring:
-	sudo docker compose -f docker-compose.monitoring.yml logs -f
-
-# tail the logs of the frontend container
-logs-frontend:
-	sudo docker compose -f docker-compose.production.yml logs -f frontend
+	docker compose -f docker-compose.monitoring.yml logs -f
 
 # tail the logs of the backend container
 logs-backend:
-	sudo docker compose -f docker-compose.production.yml logs -f backend
+	docker compose -f docker-compose.production.yml logs -fd
 
 stop-containers:
-	sudo docker compose -f docker-compose.production.yml stop
-	sudo docker compose -f docker-compose.production.yml down
+	docker compose -f docker-compose.production.yml stop
+	docker compose -f docker-compose.production.yml down
+
+get-autoheal-log-path:
+	docker inspect cashier_autoheal --format='{{.LogPath}}'
+
+backup:
+	./backup_postgres.sh ENV_FILE=.env APP_NAME=cashier BACKUP_DIR=/home/omar/apps/backups/backups $0
