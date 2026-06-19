@@ -5,6 +5,8 @@ services:
     image: postgres:15
     container_name: cashier_db
     restart: always
+    labels:
+      autoheal: "true"
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -49,10 +51,10 @@ services:
 
     # optional but recommended
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "10", "http://localhost:8000/health/"]
       interval: 30s
-      timeout: 10s
-      retries: 5
+      timeout: 12s
+      retries: 3
       start_period: 60s
 
   autoheal:
