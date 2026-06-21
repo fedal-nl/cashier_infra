@@ -45,6 +45,7 @@ services:
     env_file:
       - .env
     environment:
+      BACKEND_INSTANCE: backend-1
       DB_HOST: db
 
     # optional but recommended
@@ -79,6 +80,7 @@ services:
     env_file:
       - .env
     environment:
+      BACKEND_INSTANCE: backend-2
       DB_HOST: db
 
     healthcheck:
@@ -112,6 +114,7 @@ services:
     env_file:
       - .env
     environment:
+      BACKEND_INSTANCE: backend-3
       DB_HOST: db
 
     healthcheck:

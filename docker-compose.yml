@@ -30,6 +30,8 @@ services:
       - backend_venv:/app/.venv
     env_file: 
       - .env
+    environment:
+      BACKEND_INSTANCE: backend-1
     depends_on:
       - db
     healthcheck:
@@ -54,6 +56,8 @@ services:
       - backend_venv:/app/.venv
     env_file:
       - .env
+    environment:
+      BACKEND_INSTANCE: backend-2
     depends_on:
       db:
         condition: service_started
@@ -81,6 +85,8 @@ services:
       - backend_venv:/app/.venv
     env_file:
       - .env
+    environment:
+      BACKEND_INSTANCE: backend-3
     depends_on:
       db:
         condition: service_started
