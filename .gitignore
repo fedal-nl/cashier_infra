@@ -2,6 +2,7 @@
 backend/
 frontend/
 aklahlana-website/
+cashier-reports/
 
 .env
 .env.prod
