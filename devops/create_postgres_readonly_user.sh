@@ -1,15 +1,54 @@
 #!/bin/sh
 set -eu
 
-ENV_FILE="${ENV_FILE:-.env}"
-COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
+if [ -z "${ENV_FILE:-}" ]; then
+  if [ -f ".env" ]; then
+    ENV_FILE=".env"
+  else
+    echo "No .env file found. Set ENV_FILE=/path/to/env-file." >&2
+    exit 1
+  fi
+elif [ ! -f "$ENV_FILE" ]; then
+  echo "Environment file not found: $ENV_FILE" >&2
+  exit 1
+fi
+
+if [ -z "${COMPOSE_FILE:-}" ]; then
+  if [ -f "docker-compose.yml" ]; then
+    COMPOSE_FILE="docker-compose.yml"
+  elif [ -f "docker-compose.production.yml" ]; then
+    COMPOSE_FILE="docker-compose.production.yml"
+  else
+    echo "No docker compose file found. Set COMPOSE_FILE=/path/to/compose.yml." >&2
+    exit 1
+  fi
+fi
+
 DB_SERVICE="${DB_SERVICE:-db}"
 
-if [ -f "$ENV_FILE" ]; then
-  set -a
-  . "$ENV_FILE"
-  set +a
-fi
+load_env_value() {
+  key="$1"
+  current_value="$(eval "printf '%s' \"\${$key:-}\"")"
+
+  if [ -n "$current_value" ]; then
+    return
+  fi
+
+  value="$(
+    grep -E "^${key}=" "$ENV_FILE" \
+      | tail -n 1 \
+      | sed "s/^${key}=//"
+  )"
+
+  if [ -n "$value" ]; then
+    export "$key=$value"
+  fi
+}
+
+load_env_value DB_NAME
+load_env_value DB_USER
+load_env_value REPORTS_DB_USER
+load_env_value REPORTS_DB_PASSWORD
 
 : "${DB_NAME:?DB_NAME is required}"
 : "${DB_USER:?DB_USER is required}"
@@ -17,6 +56,8 @@ fi
 : "${REPORTS_DB_PASSWORD:=cashier_readonly}"
 
 # Creates or updates the read-only reporting role for an already-initialized DB.
+echo "Using env file: $ENV_FILE"
+echo "Using compose file: $COMPOSE_FILE"
 docker compose -f "$COMPOSE_FILE" exec -T "$DB_SERVICE" psql \
   --username "$DB_USER" \
   --dbname "$DB_NAME" \

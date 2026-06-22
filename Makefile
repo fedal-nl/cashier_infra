@@ -1,7 +1,7 @@
 # Makefile for frontend project
 # command to run: make {command name}
 
-.PHONY: help check-nginx reload-nginx deploy start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers get-autoheal-log-path backup
+.PHONY: help check-nginx reload-nginx deploy start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers get-autoheal-log-path create-reporting-db-user backup
 
 help:
 	@echo "Available commands:"
@@ -16,6 +16,7 @@ help:
 	@echo "  make logs-monitoring       Tail monitoring logs"
 	@echo "  make logs-backend          Tail backend logs"
 	@echo "  make get-autoheal-log-path Print autoheal Docker log file path"
+	@echo "  make create-reporting-db-user Create/update read-only reporting DB user"
 	@echo "  make backup                Run Postgres backup script"
 
 # command to check nginx configuration
@@ -59,6 +60,9 @@ get-autoheal-log-path:
 
 check-db-connection:
 	docker exec cashier_db pg_isready -U "$DB_USER" -d "$DB_NAME"
+
+create-reporting-db-user:
+	COMPOSE_FILE=docker-compose.production.yml ./devops/create_postgres_readonly_user.sh
 
 backup:
 	./backup_postgres.sh ENV_FILE=.env APP_NAME=cashier BACKUP_DIR=/home/omar/apps/backups/backups $0
