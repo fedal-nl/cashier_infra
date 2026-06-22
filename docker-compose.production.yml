@@ -11,8 +11,11 @@ services:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      REPORTS_DB_USER: ${REPORTS_DB_USER}
+      REPORTS_DB_PASSWORD: ${REPORTS_DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./devops/postgres-init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 30s
@@ -123,6 +126,22 @@ services:
       timeout: 12s
       retries: 3
       start_period: 60s
+
+  reports:
+    image: ghcr.io/fedal-nl/cashier_reports:latest
+    container_name: cashier_reports
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8501:8501"
+    environment:
+      REPORTS_DB_NAME: ${DB_NAME}
+      REPORTS_DB_USER: ${REPORTS_DB_USER}
+      REPORTS_DB_PASSWORD: ${REPORTS_DB_PASSWORD}
+      REPORTS_DB_HOST: db
+      REPORTS_DB_PORT: ${DB_PORT:-5432}
 
   autoheal:
     image: willfarrell/autoheal:latest

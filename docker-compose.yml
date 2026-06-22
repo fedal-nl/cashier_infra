@@ -9,8 +9,11 @@ services:
       POSTGRES_DB: cashier
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      REPORTS_DB_USER: ${REPORTS_DB_USER:-cashier_readonly}
+      REPORTS_DB_PASSWORD: ${REPORTS_DB_PASSWORD:-cashier_readonly}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./devops/postgres-init:/docker-entrypoint-initdb.d:ro
 
   backend:
     image: ghcr.io/fedal-nl/cashier_backend_api:latest
@@ -130,6 +133,25 @@ services:
     env_file:
       - .env
 
+  reports:
+    build:
+      context: ./cashier-reports
+      dockerfile: Dockerfile
+    container_name: cashier_reports
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./cashier-reports:/app
+    environment:
+      REPORTS_DB_NAME: ${DB_NAME:-cashier}
+      REPORTS_DB_USER: ${REPORTS_DB_USER:-cashier_readonly}
+      REPORTS_DB_PASSWORD: ${REPORTS_DB_PASSWORD:-cashier_readonly}
+      REPORTS_DB_HOST: db
+      REPORTS_DB_PORT: ${DB_PORT:-5432}
+    depends_on:
+      - db
+
   nginx:
     image: nginx:alpine
     container_name: cashier_nginx
@@ -144,6 +166,7 @@ services:
       - backend-3
       - frontend
       - website
+      - reports
 
   autoheal:
     image: willfarrell/autoheal:latest
