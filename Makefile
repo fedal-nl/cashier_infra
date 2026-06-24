@@ -1,6 +1,9 @@
 # Makefile for frontend project
 # command to run: make {command name}
 
+PRODUCTION_COMPOSE=docker compose -f docker-compose.production.yml
+APP_SERVICES=backend backend-2 backend-3 reports autoheal api-stack-autoheal
+
 .PHONY: help check-nginx reload-nginx deploy start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers get-autoheal-log-path check-db-connection create-reporting-db-user backup
 
 help:
@@ -8,9 +11,9 @@ help:
 	@echo "  make help                  Show this help message"
 	@echo "  make check-nginx           Check nginx configuration"
 	@echo "  make reload-nginx          Reload nginx service"
-	@echo "  make deploy                Pull and start production containers"
-	@echo "  make restart-containers    Restart production containers"
-	@echo "  make stop-containers       Stop and remove production containers"
+	@echo "  make deploy                Pull and start production app containers, excluding db"
+	@echo "  make restart-containers    Restart production app containers, excluding db"
+	@echo "  make stop-containers       Stop and remove production app containers, excluding db"
 	@echo "  make start-monitoring      Start monitoring containers"
 	@echo "  make stop-monitoring       Stop monitoring containers"
 	@echo "  make logs-monitoring       Tail monitoring logs"
@@ -30,8 +33,9 @@ reload-nginx:
 
 # on production pull the latest images using the docker-compose.production.yml file and restart the containers
 deploy:
-	docker compose -f docker-compose.production.yml pull
-	docker compose -f docker-compose.production.yml up -d
+	$(PRODUCTION_COMPOSE) pull $(APP_SERVICES)
+	$(PRODUCTION_COMPOSE) up -d --no-deps backend
+	$(PRODUCTION_COMPOSE) up -d --no-deps backend-2 backend-3 reports autoheal api-stack-autoheal
 
 # start the monitoring containers using the docker-compose.monitoring.yml file
 start-monitoring:
@@ -47,14 +51,14 @@ logs-monitoring:
 
 # tail the logs of the backend container
 logs-backend:
-	docker compose -f docker-compose.production.yml logs -fd
+	$(PRODUCTION_COMPOSE) logs -f backend backend-2 backend-3
 
 restart-containers:
-	docker compose -f docker-compose.production.yml restart
+	$(PRODUCTION_COMPOSE) restart $(APP_SERVICES)
 
 stop-containers:
-	docker compose -f docker-compose.production.yml stop
-	docker compose -f docker-compose.production.yml down
+	$(PRODUCTION_COMPOSE) stop $(APP_SERVICES)
+	$(PRODUCTION_COMPOSE) rm -f $(APP_SERVICES)
 
 get-autoheal-log-path:
 	docker inspect cashier_autoheal --format='{{.LogPath}}'

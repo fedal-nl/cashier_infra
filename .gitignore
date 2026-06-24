@@ -3,6 +3,7 @@ backend/
 frontend/
 aklahlana-website/
 cashier-reports/
+cashier-etl/
 
 .env
 .env.prod
