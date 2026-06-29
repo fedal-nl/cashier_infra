@@ -11,3 +11,6 @@ cashier-etl/
 nginx/nginx.conf
 
 staticfiles/
+
+# dump files
+*.dump

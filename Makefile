@@ -2,9 +2,14 @@
 # command to run: make {command name}
 
 PRODUCTION_COMPOSE=docker compose -f docker-compose.production.yml
+DEV_COMPOSE=docker compose -f docker-compose.yml
 APP_SERVICES=backend backend-2 backend-3 reports autoheal api-stack-autoheal
+BACKUP_FILE?=backup_cashier_20260629_130001.dump
+DEV_DB_NAME?=cashier
+PROD_DB_NAME?=cashier_app
+RESTORE_OPTIONS=--clean --if-exists --no-owner --no-acl --exit-on-error
 
-.PHONY: help check-nginx reload-nginx deploy start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers get-autoheal-log-path check-db-connection create-reporting-db-user backup
+.PHONY: help check-nginx reload-nginx deploy start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers restart-db get-autoheal-log-path check-db-connection create-reporting-db-user backup import-dev-db restore-prod-db
 
 help:
 	@echo "Available commands:"
@@ -13,6 +18,7 @@ help:
 	@echo "  make reload-nginx          Reload nginx service"
 	@echo "  make deploy                Pull and start production app containers, excluding db"
 	@echo "  make restart-containers    Restart production app containers, excluding db"
+	@echo "  make restart-db            Restart production Postgres container"
 	@echo "  make stop-containers       Stop and remove production app containers, excluding db"
 	@echo "  make start-monitoring      Start monitoring containers"
 	@echo "  make stop-monitoring       Stop monitoring containers"
@@ -22,6 +28,10 @@ help:
 	@echo "  make check-db-connection   Check Postgres readiness inside Docker"
 	@echo "  make create-reporting-db-user Create/update read-only reporting DB user"
 	@echo "  make backup                Run Postgres backup script"
+	@echo "  make import-dev-db BACKUP_FILE=backup.dump"
+	@echo "                             Import a backup into local dev Postgres"
+	@echo "  make restore-prod-db BACKUP_FILE=backup.dump CONFIRM=restore-production"
+	@echo "                             Restore a backup into production Postgres"
 
 # command to check nginx configuration
 check-nginx:
@@ -56,6 +66,9 @@ logs-backend:
 restart-containers:
 	$(PRODUCTION_COMPOSE) restart $(APP_SERVICES)
 
+restart-db:
+	$(PRODUCTION_COMPOSE) restart db
+
 stop-containers:
 	$(PRODUCTION_COMPOSE) stop $(APP_SERVICES)
 	$(PRODUCTION_COMPOSE) rm -f $(APP_SERVICES)
@@ -70,4 +83,17 @@ create-reporting-db-user:
 	COMPOSE_FILE=docker-compose.production.yml ./devops/create_postgres_readonly_user.sh
 
 backup:
-	./backup_postgres.sh ENV_FILE=.env APP_NAME=cashier BACKUP_DIR=/home/omar/apps/backups/backups $0
+	ENV_FILE=.env APP_NAME=cashier BACKUP_DIR=/home/omar/apps/backups/backups ./devops/backup_postgres.sh
+
+import-dev-db:
+	@test -f "$(BACKUP_FILE)" || (echo "Missing backup file: $(BACKUP_FILE)" >&2; exit 1)
+	$(DEV_COMPOSE) up -d db
+	$(DEV_COMPOSE) exec -T db sh -c 'PGPASSWORD="$$POSTGRES_PASSWORD" pg_restore $(RESTORE_OPTIONS) --host=localhost --username="$$POSTGRES_USER" --dbname="$(DEV_DB_NAME)"' < "$(BACKUP_FILE)"
+
+restore-prod-db:
+	@test "$(CONFIRM)" = "restore-production" || (echo "Refusing production restore. Re-run with CONFIRM=restore-production" >&2; exit 1)
+	@test -f "$(BACKUP_FILE)" || (echo "Missing backup file: $(BACKUP_FILE)" >&2; exit 1)
+	$(PRODUCTION_COMPOSE) stop $(APP_SERVICES)
+	$(PRODUCTION_COMPOSE) exec -T db sh -c 'PGPASSWORD="$$POSTGRES_PASSWORD" pg_restore $(RESTORE_OPTIONS) --host=localhost --username="$$POSTGRES_USER" --dbname="$(PROD_DB_NAME)"' < "$(BACKUP_FILE)"
+	$(PRODUCTION_COMPOSE) up -d --no-deps backend
+	$(PRODUCTION_COMPOSE) up -d --no-deps backend-2 backend-3 reports autoheal api-stack-autoheal
