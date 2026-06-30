@@ -16,7 +16,7 @@ help:
 	@echo "  make help                  Show this help message"
 	@echo "  make check-nginx           Check nginx configuration"
 	@echo "  make reload-nginx          Reload nginx service"
-	@echo "  make deploy                Pull and start production app containers, excluding db"
+	@echo "  make deploy                Stop, pull, and start the full production stack"
 	@echo "  make restart-containers    Restart production app containers, excluding db"
 	@echo "  make restart-db            Restart production Postgres container"
 	@echo "  make stop-containers       Stop and remove production app containers, excluding db"
@@ -41,11 +41,11 @@ check-nginx:
 reload-nginx:
 	sudo systemctl reload nginx
 
-# on production pull the latest images using the docker-compose.production.yml file and restart the containers
+# on production stop the full stack, pull the latest images, and start everything again
 deploy:
-	$(PRODUCTION_COMPOSE) pull $(APP_SERVICES)
-	$(PRODUCTION_COMPOSE) up -d --no-deps backend
-	$(PRODUCTION_COMPOSE) up -d --no-deps backend-2 backend-3 reports autoheal api-stack-autoheal
+	$(PRODUCTION_COMPOSE) down --remove-orphans
+	$(PRODUCTION_COMPOSE) pull
+	$(PRODUCTION_COMPOSE) up -d
 
 # start the monitoring containers using the docker-compose.monitoring.yml file
 start-monitoring:
