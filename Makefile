@@ -4,12 +4,13 @@
 PRODUCTION_COMPOSE=docker compose -f docker-compose.production.yml
 DEV_COMPOSE=docker compose -f docker-compose.yml
 APP_SERVICES=backend backend-2 backend-3 reports autoheal api-stack-autoheal
-BACKUP_FILE?=backup_cashier_20260629_130001.dump
+PRODUCTION_SERVICES=db $(APP_SERVICES)
+BACKUP_FILE?=backup_cashier_20260705_130001.dump
 DEV_DB_NAME?=cashier
-PROD_DB_NAME?=cashier_app
+PROD_DB_NAME?=cashier-app
 RESTORE_OPTIONS=--clean --if-exists --no-owner --no-acl --exit-on-error
 
-.PHONY: help check-nginx reload-nginx deploy start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers restart-db get-autoheal-log-path check-db-connection create-reporting-db-user backup import-dev-db restore-prod-db
+.PHONY: help check-nginx reload-nginx deploy start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers restart-db get-autoheal-log-path check-db-connection create-reporting-db-user backup import-dev-db restore-prod-db docker-stats
 
 help:
 	@echo "Available commands:"
@@ -32,6 +33,7 @@ help:
 	@echo "                             Import a backup into local dev Postgres"
 	@echo "  make restore-prod-db BACKUP_FILE=backup.dump CONFIRM=restore-production"
 	@echo "                             Restore a backup into production Postgres"
+	@echo "  make docker-stats          Show Docker container stats"
 
 # command to check nginx configuration
 check-nginx:
@@ -41,11 +43,12 @@ check-nginx:
 reload-nginx:
 	sudo systemctl reload nginx
 
-# on production stop the full stack, pull the latest images, and start everything again
+# on production stop, pull, and start only the services in docker-compose.production.yml
 deploy:
-	$(PRODUCTION_COMPOSE) down --remove-orphans
-	$(PRODUCTION_COMPOSE) pull
-	$(PRODUCTION_COMPOSE) up -d
+	$(PRODUCTION_COMPOSE) stop $(PRODUCTION_SERVICES)
+	$(PRODUCTION_COMPOSE) rm -f $(PRODUCTION_SERVICES)
+	$(PRODUCTION_COMPOSE) pull $(PRODUCTION_SERVICES)
+	$(PRODUCTION_COMPOSE) up -d $(PRODUCTION_SERVICES)
 
 # start the monitoring containers using the docker-compose.monitoring.yml file
 start-monitoring:
@@ -97,3 +100,6 @@ restore-prod-db:
 	$(PRODUCTION_COMPOSE) exec -T db sh -c 'PGPASSWORD="$$POSTGRES_PASSWORD" pg_restore $(RESTORE_OPTIONS) --host=localhost --username="$$POSTGRES_USER" --dbname="$(PROD_DB_NAME)"' < "$(BACKUP_FILE)"
 	$(PRODUCTION_COMPOSE) up -d --no-deps backend
 	$(PRODUCTION_COMPOSE) up -d --no-deps backend-2 backend-3 reports autoheal api-stack-autoheal
+
+docker-stats:
+	docker stats --no-stream
