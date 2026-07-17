@@ -9,13 +9,88 @@ services:
       POSTGRES_DB: cashier
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-cashier_replicator}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-cashier_replicator}
       REPORTS_DB_USER: ${REPORTS_DB_USER:-cashier_readonly}
       REPORTS_DB_PASSWORD: ${REPORTS_DB_PASSWORD:-cashier_readonly}
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - wal_keep_size=512MB
+      - -c
+      - hot_standby=on
     volumes:
       - postgres_18_restored:/var/lib/postgresql
       - ./devops/postgres-init-dev/00-restore-cashier-backup.sh:/docker-entrypoint-initdb.d/00-restore-cashier-backup.sh:ro
+      - ./devops/postgres-init-dev/01-create-replication-user.sh:/docker-entrypoint-initdb.d/01-create-replication-user.sh:ro
       - ./devops/postgres-init/01-create-reporting-user.sh:/docker-entrypoint-initdb.d/01-create-reporting-user.sh:ro
       - ./backup_cashier_20260705_130001.dump:/docker-entrypoint-initdb.d/backup_cashier_20260705_130001.dump:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  db-replica-1:
+    image: postgres:18
+    container_name: cashier_db_replica_1
+    restart: always
+    environment:
+      PGDATA: /var/lib/postgresql/18/docker
+      PRIMARY_HOST: db
+      PRIMARY_PORT: 5432
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-cashier_replicator}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-cashier_replicator}
+      POSTGRES_REPLICATION_CIDRS: all
+    entrypoint: ["/usr/local/bin/setup-postgres-replica.sh"]
+    volumes:
+      - postgres_18_replica_1:/var/lib/postgresql
+      - ./devops/postgres-replica/setup-postgres-replica.sh:/usr/local/bin/setup-postgres-replica.sh:ro
+    ports:
+      - "5433:5432"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_REPLICATION_USER -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  db-replica-2:
+    image: postgres:18
+    container_name: cashier_replica_etl
+    restart: always
+    environment:
+      PGDATA: /var/lib/postgresql/18/docker
+      PRIMARY_HOST: db-replica-1
+      PRIMARY_PORT: 5432
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER:-cashier_replicator}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD:-cashier_replicator}
+      POSTGRES_REPLICATION_CIDRS: all
+    entrypoint: ["/usr/local/bin/setup-postgres-replica.sh"]
+    volumes:
+      - postgres_18_replica_2:/var/lib/postgresql
+      - ./devops/postgres-replica/setup-postgres-replica.sh:/usr/local/bin/setup-postgres-replica.sh:ro
+    ports:
+      - "127.0.0.1:5434:5432"
+    depends_on:
+      db-replica-1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_REPLICATION_USER -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
 
   backend:
     image: ghcr.io/fedal-nl/cashier_backend_api:latest
@@ -154,6 +229,25 @@ services:
     depends_on:
       - db
 
+  cashier-etl:
+    build:
+      context: ./cashier-etl
+      dockerfile: Dockerfile
+    container_name: cashier_etl
+    restart: unless-stopped
+    env_file:
+      - ./cashier-etl/.env
+    command: >
+      sh -c 'while true; do
+        python src/main.py;
+        sleep "$${ETL_INTERVAL_SECONDS:-300}";
+      done'
+    volumes:
+      - ./cashier-etl/src:/app/src
+    depends_on:
+      db-replica-2:
+        condition: service_healthy
+
   nginx:
     image: nginx:alpine
     container_name: cashier_nginx
@@ -188,5 +282,7 @@ services:
 
 volumes:
   postgres_18_restored:
+  postgres_18_replica_1:
+  postgres_18_replica_2:
   static_volume:
   backend_venv:

@@ -1,0 +1,24 @@
+services:
+  replica-etl:
+    image: postgres:18
+    container_name: cashier_replica_etl
+    restart: always
+    env_file:
+      - ${REPLICA_ETL_ENV_FILE:-.env.replica-etl}
+    environment:
+      PGDATA: /var/lib/postgresql/18/docker
+    entrypoint: ["/usr/local/bin/setup-postgres-replica.sh"]
+    volumes:
+      - postgres_18_replica_etl:/var/lib/postgresql
+      - ./devops/postgres-replica/setup-postgres-replica.sh:/usr/local/bin/setup-postgres-replica.sh:ro
+    ports:
+      - "${REPLICA_ETL_DB_BIND_IP:-127.0.0.1}:${REPLICA_ETL_DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_REPLICATION_USER -d postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  postgres_18_replica_etl:
