@@ -1,0 +1,4 @@
+services:
+  db-replica-1:
+    ports:
+      - "${POSTGRES_REPLICA_REMOTE_BIND_IP:-0.0.0.0}:${POSTGRES_REPLICA_REMOTE_PORT:-5434}:5432"

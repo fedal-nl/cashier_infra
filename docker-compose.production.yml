@@ -11,8 +11,23 @@ services:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD}
+      POSTGRES_REPLICATION_CIDRS: ${POSTGRES_REPLICATION_CIDRS:-samenet}
       REPORTS_DB_USER: ${REPORTS_DB_USER}
       REPORTS_DB_PASSWORD: ${REPORTS_DB_PASSWORD}
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_replication_slots=10
+      - -c
+      - wal_keep_size=${POSTGRES_WAL_KEEP_SIZE:-1024MB}
+      - -c
+      - hot_standby=on
     volumes:
       - postgres_18_data:/var/lib/postgresql
       - ./devops/postgres-init:/docker-entrypoint-initdb.d:ro
@@ -22,6 +37,33 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+
+  db-replica-1:
+    image: postgres:18
+    container_name: cashier_db_replica_1
+    restart: always
+    environment:
+      PGDATA: /var/lib/postgresql/18/docker
+      PRIMARY_HOST: db
+      PRIMARY_PORT: 5432
+      POSTGRES_REPLICATION_USER: ${POSTGRES_REPLICATION_USER}
+      POSTGRES_REPLICATION_PASSWORD: ${POSTGRES_REPLICATION_PASSWORD}
+      POSTGRES_REPLICATION_CIDRS: ${POSTGRES_REPLICATION_CIDRS:-samenet}
+    entrypoint: ["/usr/local/bin/setup-postgres-replica.sh"]
+    volumes:
+      - postgres_18_replica_1:/var/lib/postgresql
+      - ./devops/postgres-replica/setup-postgres-replica.sh:/usr/local/bin/setup-postgres-replica.sh:ro
+    ports:
+      - "127.0.0.1:${DB_REPLICA_1_PORT:-5433}:5432"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_REPLICATION_USER -d postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   backend:
     image: ghcr.io/fedal-nl/cashier_backend_api:latest
@@ -211,3 +253,4 @@ services:
 
 volumes:
   postgres_18_data:
+  postgres_18_replica_1:

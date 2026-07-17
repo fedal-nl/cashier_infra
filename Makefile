@@ -4,13 +4,13 @@
 PRODUCTION_COMPOSE=docker compose -f docker-compose.production.yml
 DEV_COMPOSE=docker compose -f docker-compose.yml
 APP_SERVICES=backend backend-2 backend-3 reports autoheal api-stack-autoheal
-PRODUCTION_SERVICES=db $(APP_SERVICES)
-BACKUP_FILE?=backup_cashier_20260705_130001.dump
+PRODUCTION_SERVICES=db db-replica-1 $(APP_SERVICES)
+BACKUP_FILE?=backup_cashier_20260707_130001.dump
 DEV_DB_NAME?=cashier
 PROD_DB_NAME?=cashier-app
 RESTORE_OPTIONS=--clean --if-exists --no-owner --no-acl --exit-on-error
 
-.PHONY: help check-nginx reload-nginx deploy start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers restart-db get-autoheal-log-path check-db-connection create-reporting-db-user backup import-dev-db restore-prod-db docker-stats
+.PHONY: help check-nginx reload-nginx deploy start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers restart-db get-autoheal-log-path check-db-connection create-reporting-db-user configure-prod-replication start-prod-replica backup import-dev-db restore-prod-db reset-local-replica-db docker-stats
 
 help:
 	@echo "Available commands:"
@@ -28,9 +28,12 @@ help:
 	@echo "  make get-autoheal-log-path Print autoheal Docker log file path"
 	@echo "  make check-db-connection   Check Postgres readiness inside Docker"
 	@echo "  make create-reporting-db-user Create/update read-only reporting DB user"
+	@echo "  make configure-prod-replication Create/update production replication user"
+	@echo "  make start-prod-replica Start same-server production Postgres replica"
 	@echo "  make backup                Run Postgres backup script"
 	@echo "  make import-dev-db BACKUP_FILE=backup.dump"
 	@echo "                             Import a backup into local dev Postgres"
+	@echo "  make reset-local-replica-db Recreate local PG18 primary and replica volumes"
 	@echo "  make restore-prod-db BACKUP_FILE=backup.dump CONFIRM=restore-production"
 	@echo "                             Restore a backup into production Postgres"
 	@echo "  make docker-stats          Show Docker container stats"
@@ -85,6 +88,12 @@ check-db-connection:
 create-reporting-db-user:
 	COMPOSE_FILE=docker-compose.production.yml ./devops/create_postgres_readonly_user.sh
 
+configure-prod-replication:
+	$(PRODUCTION_COMPOSE) exec -T db sh -c '/docker-entrypoint-initdb.d/00-create-replication-user.sh && psql --username "$$POSTGRES_USER" --dbname "$$POSTGRES_DB" --command "SELECT pg_reload_conf();"'
+
+start-prod-replica:
+	$(PRODUCTION_COMPOSE) up -d db-replica-1
+
 backup:
 	ENV_FILE=.env APP_NAME=cashier BACKUP_DIR=/home/omar/apps/backups/backups ./devops/backup_postgres.sh
 
@@ -92,6 +101,12 @@ import-dev-db:
 	@test -f "$(BACKUP_FILE)" || (echo "Missing backup file: $(BACKUP_FILE)" >&2; exit 1)
 	$(DEV_COMPOSE) up -d db
 	$(DEV_COMPOSE) exec -T db sh -c 'PGPASSWORD="$$POSTGRES_PASSWORD" pg_restore $(RESTORE_OPTIONS) --host=localhost --username="$$POSTGRES_USER" --dbname="$(DEV_DB_NAME)"' < "$(BACKUP_FILE)"
+
+reset-local-replica-db:
+	$(DEV_COMPOSE) stop db-replica-1 db-replica-2 db
+	$(DEV_COMPOSE) rm -f db-replica-1 db-replica-2 db
+	-docker volume rm cashierapps_postgres_18_restored cashierapps_postgres_18_replica_1 cashierapps_postgres_18_replica_2
+	$(DEV_COMPOSE) up -d db db-replica-1 db-replica-2
 
 restore-prod-db:
 	@test "$(CONFIRM)" = "restore-production" || (echo "Refusing production restore. Re-run with CONFIRM=restore-production" >&2; exit 1)
