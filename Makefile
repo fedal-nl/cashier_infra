@@ -10,7 +10,7 @@ DEV_DB_NAME?=cashier
 PROD_DB_NAME?=cashier-app
 RESTORE_OPTIONS=--clean --if-exists --no-owner --no-acl --exit-on-error
 
-.PHONY: help check-nginx reload-nginx deploy start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers restart-db get-autoheal-log-path check-db-connection create-reporting-db-user configure-prod-replication start-prod-replica backup import-dev-db restore-prod-db reset-local-replica-db docker-stats
+.PHONY: help check-nginx reload-nginx deploy deploy-report deploy-report-dev start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers restart-db get-autoheal-log-path check-db-connection create-reporting-db-user configure-prod-replication start-prod-replica backup import-dev-db restore-prod-db reset-local-replica-db docker-stats
 
 help:
 	@echo "Available commands:"
@@ -18,6 +18,8 @@ help:
 	@echo "  make check-nginx           Check nginx configuration"
 	@echo "  make reload-nginx          Reload nginx service"
 	@echo "  make deploy                Stop, pull, and start the full production stack"
+	@echo "  make deploy-report         Pull and redeploy only reports in production"
+	@echo "  make deploy-report-dev     Build and redeploy only reports in development"
 	@echo "  make restart-containers    Restart production app containers, excluding db"
 	@echo "  make restart-db            Restart production Postgres container"
 	@echo "  make stop-containers       Stop and remove production app containers, excluding db"
@@ -52,6 +54,20 @@ deploy:
 	$(PRODUCTION_COMPOSE) rm -f $(PRODUCTION_SERVICES)
 	$(PRODUCTION_COMPOSE) pull $(PRODUCTION_SERVICES)
 	$(PRODUCTION_COMPOSE) up -d $(PRODUCTION_SERVICES)
+
+# Redeploy only the reports service in production using the published image.
+deploy-report:
+	$(PRODUCTION_COMPOSE) stop reports
+	$(PRODUCTION_COMPOSE) rm -f reports
+	$(PRODUCTION_COMPOSE) pull reports
+	$(PRODUCTION_COMPOSE) up -d --no-deps reports
+
+# Redeploy only the reports service in development using a local image build.
+deploy-report-dev:
+	$(DEV_COMPOSE) stop reports
+	$(DEV_COMPOSE) rm -f reports
+	$(DEV_COMPOSE) build reports
+	$(DEV_COMPOSE) up -d --no-deps reports
 
 # start the monitoring containers using the docker-compose.monitoring.yml file
 start-monitoring:
