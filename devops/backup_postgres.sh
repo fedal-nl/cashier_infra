@@ -8,6 +8,7 @@ APP_NAME="${APP_NAME:-cashier}"
 BACKUP_DIR="${BACKUP_DIR:-backups}"
 BACKUP_EXTENSION="${BACKUP_EXTENSION:-dump}"
 RETENTION_DAYS="${RETENTION_DAYS:-7}"
+BACKUP_REMOTE="${BACKUP_REMOTE:-backup-fedal-nl:~/cashierapp}"
 
 usage() {
   cat <<EOF
@@ -28,6 +29,9 @@ Environment variables:
                     Default: dump
   RETENTION_DAYS    Delete matching backup files older than this many days.
                     Default: 7
+  BACKUP_REMOTE     scp destination for the generated backup. Set empty to skip
+                    the remote copy.
+                    Default: backup-fedal-nl:~/cashierapp
 EOF
 }
 
@@ -118,6 +122,14 @@ docker compose -f "$COMPOSE_FILE" exec -T \
   > "$BACKUP_FILE"
 
 echo "Backup created: ${BACKUP_FILE}"
+
+if [[ -n "$BACKUP_REMOTE" ]]; then
+  echo "Copying backup to ${BACKUP_REMOTE}"
+  scp -- "$BACKUP_FILE" "${BACKUP_REMOTE%/}/"
+  echo "Backup copied to ${BACKUP_REMOTE}"
+else
+  echo "BACKUP_REMOTE is empty; skipping remote backup copy"
+fi
 
 if [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]]; then
   echo "Deleting ${APP_NAME} backups older than ${RETENTION_DAYS} days from ${BACKUP_DIR}"
