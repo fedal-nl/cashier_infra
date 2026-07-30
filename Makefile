@@ -17,7 +17,7 @@ help:
 	@echo "  make help                  Show this help message"
 	@echo "  make check-nginx           Check nginx configuration"
 	@echo "  make reload-nginx          Reload nginx service"
-	@echo "  make deploy                Stop, pull, and start the full production stack"
+	@echo "  make deploy                Pull, stop, and start the full production stack"
 	@echo "  make deploy-report         Pull and redeploy only reports in production"
 	@echo "  make deploy-report-dev     Build and redeploy only reports in development"
 	@echo "  make restart-containers    Restart production app containers, excluding db"
@@ -48,18 +48,19 @@ check-nginx:
 reload-nginx:
 	sudo systemctl reload nginx
 
-# on production stop, pull, and start only the services in docker-compose.production.yml
+# Pull all production images before stopping containers so a registry failure
+# leaves the currently running stack untouched.
 deploy:
+	$(PRODUCTION_COMPOSE) pull $(PRODUCTION_SERVICES)
 	$(PRODUCTION_COMPOSE) stop $(PRODUCTION_SERVICES)
 	$(PRODUCTION_COMPOSE) rm -f $(PRODUCTION_SERVICES)
-	$(PRODUCTION_COMPOSE) pull $(PRODUCTION_SERVICES)
 	$(PRODUCTION_COMPOSE) up -d $(PRODUCTION_SERVICES)
 
 # Redeploy only the reports service in production using the published image.
 deploy-report:
+	$(PRODUCTION_COMPOSE) pull reports
 	$(PRODUCTION_COMPOSE) stop reports
 	$(PRODUCTION_COMPOSE) rm -f reports
-	$(PRODUCTION_COMPOSE) pull reports
 	$(PRODUCTION_COMPOSE) up -d --no-deps reports
 
 # Redeploy only the reports service in development using a local image build.
