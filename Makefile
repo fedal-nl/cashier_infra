@@ -3,7 +3,7 @@
 
 PRODUCTION_COMPOSE=docker compose -f docker-compose.production.yml
 DEV_COMPOSE=docker compose -f docker-compose.yml
-APP_SERVICES=backend backend-2 backend-3 reports autoheal api-stack-autoheal
+APP_SERVICES=backend backend-2 backend-3 autoheal api-stack-autoheal
 PRODUCTION_SERVICES=db db-replica-1 $(APP_SERVICES)
 BACKUP_FILE?=backup_cashier_20260707_130001.dump
 DEV_DB_NAME?=cashier
