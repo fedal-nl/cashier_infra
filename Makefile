@@ -3,6 +3,7 @@
 
 PRODUCTION_COMPOSE=docker compose -f docker-compose.production.yml
 DEV_COMPOSE=docker compose -f docker-compose.yml
+DEV_BACKEND_SERVICES=backend backend-2 backend-3
 APP_SERVICES=backend backend-2 backend-3 reports autoheal api-stack-autoheal
 PRODUCTION_SERVICES=db db-replica-1 $(APP_SERVICES)
 BACKUP_FILE?=backup_cashier_20260707_130001.dump
@@ -10,7 +11,7 @@ DEV_DB_NAME?=cashier
 PROD_DB_NAME?=cashier-app
 RESTORE_OPTIONS=--clean --if-exists --no-owner --no-acl --exit-on-error
 
-.PHONY: help check-nginx reload-nginx deploy deploy-report deploy-report-dev start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers restart-db get-autoheal-log-path check-db-connection create-reporting-db-user configure-prod-replication start-prod-replica backup import-dev-db restore-prod-db reset-local-replica-db docker-stats
+.PHONY: help check-nginx reload-nginx deploy deploy-report deploy-report-dev dev-recreate-backends start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers restart-db get-autoheal-log-path check-db-connection create-reporting-db-user configure-prod-replication start-prod-replica backup import-dev-db restore-prod-db reset-local-replica-db docker-stats
 
 help:
 	@echo "Available commands:"
@@ -20,6 +21,7 @@ help:
 	@echo "  make deploy                Pull, stop, and start the full production stack"
 	@echo "  make deploy-report         Pull and redeploy only reports in production"
 	@echo "  make deploy-report-dev     Build and redeploy only reports in development"
+	@echo "  make dev-recreate-backends Build and recreate development backend containers"
 	@echo "  make restart-containers    Restart production app containers, excluding db"
 	@echo "  make restart-db            Restart production Postgres container"
 	@echo "  make stop-containers       Stop and remove production app containers, excluding db"
@@ -69,6 +71,10 @@ deploy-report-dev:
 	$(DEV_COMPOSE) rm -f reports
 	$(DEV_COMPOSE) build reports
 	$(DEV_COMPOSE) up -d --no-deps reports
+
+# Rebuild and force-recreate only the development backend containers.
+dev-recreate-backends:
+	$(DEV_COMPOSE) up -d --build --force-recreate --no-deps $(DEV_BACKEND_SERVICES)
 
 # start the monitoring containers using the docker-compose.monitoring.yml file
 start-monitoring:
