@@ -11,7 +11,7 @@ DEV_DB_NAME?=cashier
 PROD_DB_NAME?=cashier-app
 RESTORE_OPTIONS=--clean --if-exists --no-owner --no-acl --exit-on-error
 
-.PHONY: help check-nginx reload-nginx deploy deploy-report deploy-report-dev dev-recreate-backends start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers restart-db get-autoheal-log-path check-db-connection create-reporting-db-user configure-prod-replication start-prod-replica backup import-dev-db restore-prod-db reset-local-replica-db docker-stats
+.PHONY: help check-nginx reload-nginx deploy deploy-apps deploy-report deploy-report-dev dev-recreate-backends start-monitoring stop-monitoring logs-monitoring logs-backend stop-containers restart-containers restart-db get-autoheal-log-path check-db-connection create-reporting-db-user configure-prod-replication start-prod-replica backup import-dev-db restore-prod-db reset-local-replica-db docker-stats
 
 help:
 	@echo "Available commands:"
@@ -19,6 +19,7 @@ help:
 	@echo "  make check-nginx           Check nginx configuration"
 	@echo "  make reload-nginx          Reload nginx service"
 	@echo "  make deploy                Pull, stop, and start the full production stack"
+	@echo "  make deploy-apps           Pull and redeploy production apps without databases"
 	@echo "  make deploy-report         Pull and redeploy only reports in production"
 	@echo "  make deploy-report-dev     Build and redeploy only reports in development"
 	@echo "  make dev-recreate-backends Build and recreate development backend containers"
@@ -57,6 +58,14 @@ deploy:
 	$(PRODUCTION_COMPOSE) stop $(PRODUCTION_SERVICES)
 	$(PRODUCTION_COMPOSE) rm -f $(PRODUCTION_SERVICES)
 	$(PRODUCTION_COMPOSE) up -d $(PRODUCTION_SERVICES)
+
+# Redeploy production application services while leaving all database
+# containers untouched. Pull first so registry failures do not stop live apps.
+deploy-apps:
+	$(PRODUCTION_COMPOSE) pull $(APP_SERVICES)
+	$(PRODUCTION_COMPOSE) stop $(APP_SERVICES)
+	$(PRODUCTION_COMPOSE) rm -f $(APP_SERVICES)
+	$(PRODUCTION_COMPOSE) up -d --no-deps $(APP_SERVICES)
 
 # Redeploy only the reports service in production using the published image.
 deploy-report:
